@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import FileUpload from "./ui/FileUpload";
 import {
   Save,
   Plus,
@@ -141,6 +142,16 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
     name: "perusahaan"
   });
 
+  const [dokumenFiles, setDokumenFiles] = useState<Record<string, File | null>>({
+    file_spt: null,
+    file_rincian: null,
+    file_sppd: null,
+    file_sptjm: null,
+    file_kwitansi: null,
+    file_laporan_perjadin: null,
+    file_surat_penawaran: null,
+  });
+
   const { fields: transportFields, append: appendTransport, remove: removeTransport } = useFieldArray({
     control,
     name: "transportDetails"
@@ -169,10 +180,26 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
   const onSubmit = useCallback(async (data: SpjFormValues) => {
     setIsSubmitting(true);
     try {
+      // Create an object to send that mimics the old structure, 
+      // where we map the 'File' name as the link value just for backward compatibility with API.
+      // In a real scenario with Storage, we'd use FormData here.
+      const simulatedDokumenLinks = Object.keys(dokumenFiles).reduce((acc, key) => {
+        if (dokumenFiles[key]) {
+          acc[key] = dokumenFiles[key]?.name;
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
+      const payload = {
+        ...data,
+        total_biaya: totalBiaya,
+        dokumen: simulatedDokumenLinks
+      };
+
       const response = await fetch("/api/spj", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, total_biaya: totalBiaya }),
+        body: JSON.stringify(payload),
       });
       if (response.ok) {
         onSuccess();
@@ -615,7 +642,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
             <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Status Kelengkapan</h4>
             <div className="space-y-3">
               {docChecklist.map((doc) => {
-                const isUploaded = !!watchDokumen[doc.id as keyof typeof watchDokumen];
+                const isUploaded = !!dokumenFiles[doc.id];
                 if (doc.id === "file_sptjm" && watchSumberAnggaran !== "SPJ PNBP") return null;
                 if (doc.id === "file_kwitansi" && watchMetodeBayar === "KKP") return null;
 
@@ -647,12 +674,14 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
                   <div key={doc.id}>
                     <label className="block text-xs font-bold text-slate-600 mb-1">{doc.label}</label>
                     <div className="relative">
-                      <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        {...register(`dokumen.${doc.id as keyof typeof watchDokumen}`)}
-                        placeholder="Tempel link dokumen (Google Drive/Cloud)"
-                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      <FileUpload
+                        label=""
+                        accept=".pdf,.jpg,.png,.doc,.docx"
+                        onFileChange={(file) => {
+                          setDokumenFiles(prev => ({ ...prev, [doc.id]: file }));
+                          // Also clear the react-hook-form value if it exists 
+                          // or you can set it if you want the form to validate presence
+                        }}
                       />
                     </div>
                   </div>
