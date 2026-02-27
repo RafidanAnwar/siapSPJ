@@ -96,20 +96,51 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
+  // Pre-compiled statements for optimal performance
+  const selectAllSpjStmt = db.prepare("SELECT * FROM spj ORDER BY created_at DESC");
+  const insertSpjStmt = db.prepare(`
+    INSERT INTO spj (
+      no_spj, no_spt, no_sppd, no_spm, no_drpp, kode_mak,
+      sumber_anggaran, jenis_kegiatan, metode_pembayaran,
+      metode_bayar_transport, metode_bayar_hotel,
+      tanggal_berangkat, tanggal_pulang, lama_perjalanan,
+      tujuan, provinsi_tujuan, unit_organisasi, representasi, bbm, tol, total_biaya,
+      file_spt, file_rincian, file_sppd, file_sptjm, 
+      file_kwitansi, file_laporan_perjadin, file_surat_penawaran
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertTransportStmt = db.prepare("INSERT INTO transport_detail (spj_id, jenis, nomor_tiket, maskapai, tarif) VALUES (?, ?, ?, ?, ?)");
+  const insertPenginapanStmt = db.prepare("INSERT INTO penginapan_detail (spj_id, nama_hotel, jumlah_hari, tarif, is_30_percent) VALUES (?, ?, ?, ?, ?)");
+  const insertTimStmt = db.prepare("INSERT INTO tim_kegiatan (spj_id, nama, jabatan, golongan, unit_kerja) VALUES (?, ?, ?, ?, ?)");
+  const insertPerusahaanStmt = db.prepare("INSERT INTO perusahaan (spj_id, nama_perusahaan) VALUES (?, ?)");
+  const insertLogStmt = db.prepare("INSERT INTO log_aktivitas (user, aktivitas) VALUES (?, ?)");
+
+  const statTotalDipaStmt = db.prepare("SELECT SUM(total_biaya) as total FROM spj WHERE sumber_anggaran = 'SPJ DIPA'");
+  const statTotalPnbpStmt = db.prepare("SELECT SUM(total_biaya) as total FROM spj WHERE sumber_anggaran = 'SPJ PNBP'");
+  const statCountPerjadinStmt = db.prepare("SELECT COUNT(*) as count FROM spj WHERE jenis_kegiatan = 'Perjalanan Dinas'");
+  const statCountRapatStmt = db.prepare("SELECT COUNT(*) as count FROM spj WHERE jenis_kegiatan = 'Rapat'");
+  const statKkpUsageStmt = db.prepare("SELECT SUM(total_biaya) as total FROM spj WHERE metode_pembayaran = 'KKP'");
+
+  // API Routes
   app.get("/api/spj", (req, res) => {
-    const rows = db.prepare("SELECT * FROM spj ORDER BY created_at DESC").all();
-    res.json(rows);
+    try {
+      const rows = selectAllSpjStmt.all();
+      res.json(rows);
+    } catch (error) {
+      console.error("GET /api/spj Error:", error);
+      res.status(500).json({ success: false, message: "Gagal mengambil data SPJ" });
+    }
   });
 
   app.post("/api/spj", (req, res) => {
-    const { 
-      basicInfo, 
-      tim, 
-      perusahaan: perusahaanList, 
+    const {
+      basicInfo,
+      tim,
+      perusahaan: perusahaanList,
       transportDetails,
       penginapanDetails,
       dokumen,
-      total_biaya 
+      total_biaya
     } = req.body;
 
     const insertSpj = db.prepare(`
@@ -124,7 +155,7 @@ async function startServer() {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const info = insertSpj.run(
+    const info = insertSpjStmt.run(
       `SPJ/${new Date().getFullYear()}/${Math.floor(Math.random() * 10000)}`,
       basicInfo.no_spt,
       basicInfo.no_sppd || null,
@@ -158,39 +189,42 @@ async function startServer() {
     const spjId = info.lastInsertRowid;
 
     if (transportDetails && transportDetails.length > 0) {
-      const insertTransport = db.prepare("INSERT INTO transport_detail (spj_id, jenis, nomor_tiket, maskapai, tarif) VALUES (?, ?, ?, ?, ?)");
-      transportDetails.forEach((t: any) => insertTransport.run(spjId, t.jenis, t.nomor_tiket, t.maskapai, t.tarif));
+      transportDetails.forEach((t: any) => insertTransportStmt.run(spjId, t.jenis, t.nomor_tiket, t.maskapai, t.tarif));
     }
 
     if (penginapanDetails && penginapanDetails.length > 0) {
-      const insertPenginapan = db.prepare("INSERT INTO penginapan_detail (spj_id, nama_hotel, jumlah_hari, tarif, is_30_percent) VALUES (?, ?, ?, ?, ?)");
-      penginapanDetails.forEach((p: any) => insertPenginapan.run(spjId, p.nama_hotel, p.jumlah_hari, p.tarif, p.is_30_percent ? 1 : 0));
+      penginapanDetails.forEach((p: any) => insertPenginapanStmt.run(spjId, p.nama_hotel, p.jumlah_hari, p.tarif, p.is_30_percent ? 1 : 0));
     }
 
     if (tim && tim.length > 0) {
-      const insertTim = db.prepare("INSERT INTO tim_kegiatan (spj_id, nama, jabatan, golongan, unit_kerja) VALUES (?, ?, ?, ?, ?)");
-      tim.forEach((m: any) => insertTim.run(spjId, m.nama, m.jabatan, m.golongan, m.unit_kerja));
+      tim.forEach((m: any) => insertTimStmt.run(spjId, m.nama, m.jabatan, m.golongan, m.unit_kerja));
     }
 
     if (perusahaanList && perusahaanList.length > 0) {
-      const insertPerusahaan = db.prepare("INSERT INTO perusahaan (spj_id, nama_perusahaan) VALUES (?, ?)");
-      perusahaanList.forEach((p: any) => insertPerusahaan.run(spjId, p.nama_perusahaan));
+      perusahaanList.forEach((p: any) => insertPerusahaanStmt.run(spjId, p.nama_perusahaan));
     }
 
-    db.prepare("INSERT INTO log_aktivitas (user, aktivitas) VALUES (?, ?)").run('System', `Created SPJ ID: ${spjId}`);
+    insertLogStmt.run('System', `Created SPJ ID: ${spjId}`);
 
     res.json({ success: true, id: spjId });
   });
 
   app.get("/api/stats", (req, res) => {
-    const stats = {
-      totalDipa: db.prepare("SELECT SUM(total_biaya) as total FROM spj WHERE sumber_anggaran = 'SPJ DIPA'").get().total || 0,
-      totalPnbp: db.prepare("SELECT SUM(total_biaya) as total FROM spj WHERE sumber_anggaran = 'SPJ PNBP'").get().total || 0,
-      countPerjadin: db.prepare("SELECT COUNT(*) as count FROM spj WHERE jenis_kegiatan = 'Perjalanan Dinas'").get().count || 0,
-      countRapat: db.prepare("SELECT COUNT(*) as count FROM spj WHERE jenis_kegiatan = 'Rapat'").get().count || 0,
-      kkpUsage: db.prepare("SELECT SUM(total_biaya) as total FROM spj WHERE metode_pembayaran = 'KKP'").get().total || 0,
-    };
-    res.json(stats);
+    try {
+      const stats = {
+        totalDipa: statTotalDipaStmt.get().total || 0,
+        totalPnbp: statTotalPnbpStmt.get().total || 0,
+        countPerjadin: statCountPerjadinStmt.get().count || 0,
+        countRapat: statCountRapatStmt.get().count || 0,
+        kkpUsage: statKkpUsageStmt.get().total || 0,
+      };
+      // Send cache-control headers since this data updates relatively slowly for summary charts
+      res.set('Cache-Control', 'public, max-age=10'); // Cache for 10 seconds locally
+      res.json(stats);
+    } catch (error) {
+      console.error("GET /api/stats Error:", error);
+      res.status(500).json({ success: false, message: "Gagal memuat analitik dashboard" });
+    }
   });
 
   // Vite middleware for development

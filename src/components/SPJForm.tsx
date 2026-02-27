@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { 
-  Save, 
-  Plus, 
-  Trash2, 
-  Upload, 
-  CheckCircle2, 
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Save,
+  Plus,
+  Trash2,
+  Upload,
+  CheckCircle2,
   AlertCircle,
   FileText,
   Calendar,
@@ -87,7 +87,7 @@ type SpjFormValues = z.infer<typeof spjSchema>;
 
 export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { register, control, handleSubmit, watch, formState: { errors } } = useForm<SpjFormValues>({
     resolver: zodResolver(spjSchema),
     defaultValues: {
@@ -160,13 +160,13 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
   const watchPenginapan = watch("penginapanDetails");
   const watchRepresentasi = watch("basicInfo.representasi") || 0;
 
-  const totalTransport = (watchTransport || []).reduce((acc, curr) => acc + (Number(curr.tarif) || 0), 0);
-  const totalPenginapan = (watchPenginapan || []).reduce((acc, curr) => acc + (Number(curr.tarif) || 0), 0);
-  const totalKomponen = Object.values(watchKomponen).reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-  
-  const totalBiaya = totalTransport + totalPenginapan + totalKomponen + Number(watchRepresentasi);
+  const totalTransport = useMemo(() => (watchTransport || []).reduce((acc, curr) => acc + (Number(curr.tarif) || 0), 0), [watchTransport]);
+  const totalPenginapan = useMemo(() => (watchPenginapan || []).reduce((acc, curr) => acc + (Number(curr.tarif) || 0), 0), [watchPenginapan]);
+  const totalKomponen = useMemo(() => Object.values(watchKomponen).reduce((acc, curr) => acc + (Number(curr) || 0), 0), [watchKomponen]);
 
-  const onSubmit = async (data: SpjFormValues) => {
+  const totalBiaya = useMemo(() => totalTransport + totalPenginapan + totalKomponen + Number(watchRepresentasi), [totalTransport, totalPenginapan, totalKomponen, watchRepresentasi]);
+
+  const onSubmit = useCallback(async (data: SpjFormValues) => {
     setIsSubmitting(true);
     try {
       const response = await fetch("/api/spj", {
@@ -176,13 +176,17 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
       });
       if (response.ok) {
         onSuccess();
+      } else {
+        const errorData = await response.json();
+        alert(`Gagal menyimpan data: ${errorData.message || 'Terjadi kesalahan pada server'}`);
       }
     } catch (error) {
-      console.error(error);
+      console.error("Submit Error:", error);
+      alert("Gagal terhubung ke server. Periksa koneksi Anda.");
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [totalBiaya, onSuccess]);
 
   const docChecklist = [
     { id: "file_spt", label: "SPT (Surat Perintah Tugas)", required: true },
@@ -219,7 +223,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
             <label className="block text-sm font-bold text-slate-700 mb-2">Sumber Anggaran</label>
-            <select 
+            <select
               {...register("basicInfo.sumber_anggaran")}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
             >
@@ -229,7 +233,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
           <div className="md:col-span-1">
             <label className="block text-sm font-bold text-slate-700 mb-2">Jenis Kegiatan</label>
-            <select 
+            <select
               {...register("basicInfo.jenis_kegiatan")}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
             >
@@ -243,7 +247,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
           <div className="md:col-span-1">
             <label className="block text-sm font-bold text-slate-700 mb-2">Metode Bayar Umum</label>
-            <select 
+            <select
               {...register("basicInfo.metode_pembayaran")}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
             >
@@ -257,7 +261,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Metode Bayar Transport</label>
-            <select 
+            <select
               {...register("basicInfo.metode_bayar_transport")}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
             >
@@ -268,7 +272,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">Metode Bayar Hotel</label>
-            <select 
+            <select
               {...register("basicInfo.metode_bayar_hotel")}
               className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
             >
@@ -350,7 +354,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
             </div>
             <h3 className="text-lg font-bold text-slate-900">Data Tim Pelaksana (Max 6)</h3>
           </div>
-          <button 
+          <button
             type="button"
             onClick={() => timFields.length < 6 && appendTim({ nama: "" })}
             className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700"
@@ -402,7 +406,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">Rincian Transportasi</h3>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => appendTransport({ jenis: "Pesawat", tarif: 0 })}
                 className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700"
@@ -453,7 +457,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">Rincian Penginapan</h3>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => appendPenginapan({ nama_hotel: "", jumlah_hari: 1, tarif: 0, is_30_percent: false })}
                 className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700"
@@ -570,7 +574,7 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
               </div>
               <h3 className="text-lg font-bold text-slate-900">Data Perusahaan yang Diuji (Max 10)</h3>
             </div>
-            <button 
+            <button
               type="button"
               onClick={() => perusahaanFields.length < 10 && appendPerusahaan({ nama_perusahaan: "" })}
               className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700"
@@ -582,10 +586,10 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {perusahaanFields.map((field, index) => (
               <div key={field.id} className="flex gap-2 items-center">
-                <input 
-                  {...register(`perusahaan.${index}.nama_perusahaan`)} 
+                <input
+                  {...register(`perusahaan.${index}.nama_perusahaan`)}
                   placeholder={`Nama Perusahaan ${index + 1}`}
-                  className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" 
+                  className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
                 />
                 <button onClick={() => removePerusahaan(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                   <Trash2 className="w-5 h-5" />
@@ -644,8 +648,8 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
                     <label className="block text-xs font-bold text-slate-600 mb-1">{doc.label}</label>
                     <div className="relative">
                       <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         {...register(`dokumen.${doc.id as keyof typeof watchDokumen}`)}
                         placeholder="Tempel link dokumen (Google Drive/Cloud)"
                         className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
@@ -660,8 +664,8 @@ export default function SPJForm({ onSuccess }: { onSuccess: () => void }) {
       </section>
 
       <div className="flex gap-4">
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={isSubmitting}
           className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
         >

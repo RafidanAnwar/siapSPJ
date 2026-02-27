@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
-import { 
-  LayoutDashboard, 
-  FileText, 
-  PlusCircle, 
-  BarChart3, 
-  ShieldCheck, 
-  LogOut, 
-  Menu, 
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  LayoutDashboard,
+  FileText,
+  PlusCircle,
+  BarChart3,
+  ShieldCheck,
+  LogOut,
+  Menu,
   X,
   User,
   Lock
@@ -26,6 +26,14 @@ interface UserData {
   role: Role;
 }
 
+const menuItems = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN", "VERIFIKATOR"] },
+  { id: "input", label: "Input SPJ Baru", icon: PlusCircle, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN"] },
+  { id: "list", label: "Data SPJ", icon: FileText, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN", "VERIFIKATOR"] },
+  { id: "reports", label: "Laporan", icon: BarChart3, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN", "VERIFIKATOR"] },
+  { id: "sdd", label: "System Design", icon: ShieldCheck, roles: ["ADMIN"] },
+];
+
 export default function App() {
   const [user, setUser] = useState<UserData | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -42,7 +50,7 @@ export default function App() {
     }
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     const { username, password } = loginForm;
 
@@ -57,7 +65,14 @@ export default function App() {
     } else {
       setError("Username atau password salah");
     }
-  };
+  }, [loginForm]);
+
+  const handleSuccessSubmit = useCallback(() => setIsSubmitted(true), []);
+
+  const filteredMenu = useMemo(() => {
+    if (!user) return [];
+    return menuItems.filter(item => item.roles.includes(user.role));
+  }, [user]);
 
   if (isPublicMode) {
     return (
@@ -66,9 +81,9 @@ export default function App() {
           <div className="flex items-center justify-between mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-md border border-slate-100 p-1">
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Logo_Kementerian_Ketenagakerjaan.png/600px-Logo_Kementerian_Ketenagakerjaan.png" 
-                  alt="Logo Kemnaker" 
+                <img
+                  src="/logo_kemnaker.png"
+                  alt="Logo Kemnaker"
                   className="w-full h-full object-contain"
                   referrerPolicy="no-referrer"
                 />
@@ -81,7 +96,7 @@ export default function App() {
           </div>
 
           {isSubmitted ? (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="bg-white p-12 rounded-3xl shadow-xl border border-slate-200 text-center space-y-6"
@@ -93,7 +108,7 @@ export default function App() {
               <p className="text-slate-500 max-w-md mx-auto">
                 Terima kasih. Data pertanggungjawaban Anda telah masuk ke sistem SIAP-SPJ dan akan segera diverifikasi oleh Bendahara.
               </p>
-              <button 
+              <button
                 onClick={() => setIsSubmitted(false)}
                 className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all"
               >
@@ -101,7 +116,7 @@ export default function App() {
               </button>
             </motion.div>
           ) : (
-            <SPJForm onSuccess={() => setIsSubmitted(true)} />
+            <SPJForm onSuccess={handleSuccessSubmit} />
           )}
         </div>
       </div>
@@ -111,16 +126,16 @@ export default function App() {
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200"
         >
           <div className="text-center mb-8">
             <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg border border-slate-100 p-2">
-              <img 
-                src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Logo_Kementerian_Ketenagakerjaan.png/600px-Logo_Kementerian_Ketenagakerjaan.png" 
-                alt="Logo Kemnaker" 
+              <img
+                src="/logo_kemnaker.png"
+                alt="Logo Kemnaker"
                 className="w-full h-full object-contain"
                 referrerPolicy="no-referrer"
               />
@@ -134,8 +149,8 @@ export default function App() {
               <label className="block text-sm font-medium text-slate-700 mb-2">Username</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   placeholder="Masukkan username"
                   value={loginForm.username}
@@ -148,8 +163,8 @@ export default function App() {
               <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input 
-                  type="password" 
+                <input
+                  type="password"
                   className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   placeholder="Masukkan password"
                   value={loginForm.password}
@@ -159,7 +174,7 @@ export default function App() {
               </div>
             </div>
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-            <button 
+            <button
               type="submit"
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all transform active:scale-[0.98]"
             >
@@ -175,35 +190,27 @@ export default function App() {
     );
   }
 
-  const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN", "VERIFIKATOR"] },
-    { id: "input", label: "Input SPJ Baru", icon: PlusCircle, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN"] },
-    { id: "list", label: "Data SPJ", icon: FileText, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN", "VERIFIKATOR"] },
-    { id: "reports", label: "Laporan", icon: BarChart3, roles: ["ADMIN", "BENDAHARA_PENGELUARAN", "BENDAHARA_PENERIMAAN", "VERIFIKATOR"] },
-    { id: "sdd", label: "System Design", icon: ShieldCheck, roles: ["ADMIN"] },
-  ];
 
-  const filteredMenu = menuItems.filter(item => item.roles.includes(user.role));
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Sidebar */}
-      <motion.aside 
+      <motion.aside
         initial={false}
         animate={{ width: isSidebarOpen ? 280 : 80 }}
         className="bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20"
       >
         <div className="p-6 flex items-center gap-4 border-b border-slate-800">
           <div className="min-w-[44px] h-11 bg-white rounded-xl flex items-center justify-center shadow-lg p-1">
-            <img 
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Logo_Kementerian_Ketenagakerjaan.png/600px-Logo_Kementerian_Ketenagakerjaan.png" 
-              alt="Logo Kemnaker" 
+            <img
+              src="/logo_kemnaker.png"
+              alt="Logo Kemnaker"
               className="w-full h-full object-contain"
               referrerPolicy="no-referrer"
             />
           </div>
           {isSidebarOpen && (
-            <motion.span 
+            <motion.span
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="font-bold text-xl text-white tracking-tight"
@@ -220,8 +227,8 @@ export default function App() {
               onClick={() => setActiveTab(item.id)}
               className={cn(
                 "w-full flex items-center gap-4 p-3 rounded-xl transition-all group",
-                activeTab === item.id 
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20" 
+                activeTab === item.id
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/20"
                   : "hover:bg-slate-800 hover:text-white"
               )}
             >
@@ -243,7 +250,7 @@ export default function App() {
               </div>
             )}
           </div>
-          <button 
+          <button
             onClick={() => setUser(null)}
             className={cn(
               "w-full flex items-center gap-4 p-3 mt-2 rounded-xl hover:bg-red-500/10 hover:text-red-400 transition-all group",
@@ -259,7 +266,7 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10">
-          <button 
+          <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
           >

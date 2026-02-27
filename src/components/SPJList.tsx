@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  FileSpreadsheet, 
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  Search,
+  Filter,
+  Download,
+  FileSpreadsheet,
   FileText as FilePdf,
   ExternalLink,
   ChevronRight,
@@ -23,31 +23,50 @@ export default function SPJList() {
   const [filterJenis, setFilterJenis] = useState("Semua");
 
   useEffect(() => {
-    fetch("/api/spj")
-      .then(res => res.json())
-      .then(data => setSpjData(data));
+    const controller = new AbortController();
+
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/spj", { signal: controller.signal });
+        if (!res.ok) throw new Error("Network response was not ok");
+        const data = await res.json();
+        setSpjData(data);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error("Failed to fetch SPJ data:", error);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
-  const filteredData = spjData.filter(item => {
-    const matchesSearch = item.no_spj?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         item.tujuan?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.no_spt?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSumber = filterSumber === "Semua" || item.sumber_anggaran === filterSumber;
-    const matchesJenis = filterJenis === "Semua" || item.jenis_kegiatan === filterJenis;
-    return matchesSearch && matchesSumber && matchesJenis;
-  });
+  const filteredData = useMemo(() => {
+    return spjData.filter(item => {
+      const matchesSearch = item.no_spj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.tujuan?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.no_spt?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSumber = filterSumber === "Semua" || item.sumber_anggaran === filterSumber;
+      const matchesJenis = filterJenis === "Semua" || item.jenis_kegiatan === filterJenis;
+      return matchesSearch && matchesSumber && matchesJenis;
+    });
+  }, [spjData, searchTerm, filterSumber, filterJenis]);
 
-  const exportToExcel = () => {
+  const exportToExcel = useCallback(() => {
     const ws = XLSX.utils.json_to_sheet(filteredData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data SPJ");
     XLSX.writeFile(wb, `Rekap_SPJ_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
+  }, [filteredData]);
 
-  const exportToPdf = () => {
+  const exportToPdf = useCallback(() => {
     const doc = new jsPDF();
     doc.text("Rekapitulasi Pertanggungjawaban SIAP-SPJ", 14, 15);
-    
+
     const tableData = filteredData.map(item => [
       item.no_spj,
       item.sumber_anggaran,
@@ -63,7 +82,7 @@ export default function SPJList() {
     });
 
     doc.save(`Laporan_SPJ_${new Date().toISOString().split('T')[0]}.pdf`);
-  };
+  }, [filteredData]);
 
   return (
     <div className="space-y-6">
@@ -73,13 +92,13 @@ export default function SPJList() {
           <p className="text-slate-500">Kelola dan pantau seluruh berkas SPJ yang telah diinput.</p>
         </div>
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={exportToExcel}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl font-bold hover:bg-emerald-100 transition-all"
           >
             <FileSpreadsheet className="w-5 h-5" /> Excel
           </button>
-          <button 
+          <button
             onClick={exportToPdf}
             className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-700 border border-rose-100 rounded-xl font-bold hover:bg-rose-100 transition-all"
           >
@@ -92,15 +111,15 @@ export default function SPJList() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="md:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Cari No SPJ, Tujuan, atau No SPT..."
               className="w-full pl-11 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select 
+          <select
             className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"
             value={filterSumber}
             onChange={(e) => setFilterSumber(e.target.value)}
@@ -109,7 +128,7 @@ export default function SPJList() {
             <option value="SPJ DIPA">SPJ DIPA</option>
             <option value="SPJ PNBP">SPJ PNBP</option>
           </select>
-          <select 
+          <select
             className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"
             value={filterJenis}
             onChange={(e) => setFilterJenis(e.target.value)}

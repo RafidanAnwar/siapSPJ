@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from "react";
-import { 
-  TrendingUp, 
-  CreditCard, 
-  Plane, 
-  Users, 
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  TrendingUp,
+  CreditCard,
+  Plane,
+  Users,
   Wallet,
   ExternalLink,
   ArrowUpRight,
   ArrowDownRight
 } from "lucide-react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  PieChart, 
-  Pie, 
-  Cell 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
 } from "recharts";
 import { formatCurrency } from "../lib/utils";
 
@@ -33,10 +33,39 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    fetch("/api/stats")
-      .then(res => res.json())
-      .then(data => setStats(data));
+    const controller = new AbortController();
+
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/stats", { signal: controller.signal });
+        if (!res.ok) throw new Error("Network response was not ok");
+        const data = await res.json();
+        setStats(data);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error("Failed to fetch stats:", error);
+        }
+      }
+    };
+
+    fetchStats();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
+
+  const publicLink = `${window.location.origin}/?mode=public`;
+
+  const [copied, setCopied] = useState(false);
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(publicLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error("Failed to copy link:", err);
+    });
+  }, [publicLink]);
 
   const chartData = [
     { name: "DIPA", value: stats.totalDipa },
@@ -52,16 +81,14 @@ export default function Dashboard() {
     { label: "Penggunaan KKP", value: formatCurrency(stats.kkpUsage), icon: CreditCard, color: "bg-rose-500", trend: "Real-time" },
   ];
 
-  const publicLink = `${window.location.origin}/?mode=public`;
-
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-sm border border-slate-100 p-1">
-            <img 
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Logo_Kementerian_Ketenagakerjaan.png/600px-Logo_Kementerian_Ketenagakerjaan.png" 
-              alt="Logo Kemnaker" 
+            <img
+              src="/logo_kemnaker.png"
+              alt="Logo Kemnaker"
               className="w-full h-full object-contain"
               referrerPolicy="no-referrer"
             />
@@ -76,15 +103,16 @@ export default function Dashboard() {
             <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Link Input Publik</p>
             <p className="text-sm font-mono text-slate-600 truncate max-w-[200px]">{publicLink}</p>
           </div>
-          <button 
-            onClick={() => {
-              navigator.clipboard.writeText(publicLink);
-              alert("Link berhasil disalin!");
-            }}
-            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all"
+          <button
+            onClick={handleCopyLink}
+            className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all relative group/copy flex items-center gap-2"
             title="Salin Link"
           >
-            <ExternalLink className="w-5 h-5" />
+            {copied ? (
+              <span className="text-xs font-bold px-1 text-emerald-600">Disalin!</span>
+            ) : (
+              <ExternalLink className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>
@@ -118,7 +146,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                <Tooltip 
+                <Tooltip
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
@@ -137,7 +165,7 @@ export default function Dashboard() {
             <Users className="w-5 h-5 text-emerald-600" />
             Komposisi Sumber Anggaran
           </h3>
-          <div className="h-[300px] flex items-center justify-center">
+          <div className="h-[300px] flex items-center justify-center relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -156,9 +184,9 @@ export default function Dashboard() {
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="absolute flex flex-col items-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-3xl font-bold text-slate-900">100%</span>
-              <span className="text-xs text-slate-500 uppercase font-bold tracking-widest">Total</span>
+              <span className="text-xs text-slate-500 uppercase font-bold tracking-widest mt-1">Total</span>
             </div>
           </div>
         </div>

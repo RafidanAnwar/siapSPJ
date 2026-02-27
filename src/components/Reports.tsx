@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { 
-  BarChart3, 
-  PieChart as PieChartIcon, 
-  Download, 
-  FileSpreadsheet, 
+import {
+  BarChart3,
+  PieChart as PieChartIcon,
+  Download,
+  FileSpreadsheet,
   FileText as FilePdf,
   Calendar,
   Filter,
@@ -19,9 +19,26 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
 
   useEffect(() => {
-    fetch("/api/spj")
-      .then(res => res.json())
-      .then(data => setSpjData(data));
+    const controller = new AbortController();
+
+    const fetchReports = async () => {
+      try {
+        const res = await fetch("/api/spj", { signal: controller.signal });
+        if (!res.ok) throw new Error("Network response was not ok");
+        const data = await res.json();
+        setSpjData(data);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error("Failed to fetch reports data:", error);
+        }
+      }
+    };
+
+    fetchReports();
+
+    return () => {
+      controller.abort();
+    };
   }, []);
 
   const reportTypes = [
@@ -51,8 +68,8 @@ export default function Reports() {
             <label className="block text-sm font-bold text-slate-700 mb-2">Tanggal Mulai</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
@@ -63,8 +80,8 @@ export default function Reports() {
             <label className="block text-sm font-bold text-slate-700 mb-2">Tanggal Selesai</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
